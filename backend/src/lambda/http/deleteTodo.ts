@@ -1,32 +1,16 @@
 import 'source-map-support/register'
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } from 'aws-lambda'
-import { docClient, todosTable, getToken } from '../helpers';
-
+import { deleteTodo } from '../../businessLogic/todos';
 import { createLogger } from '../../utils/logger';
-import { parseUserId } from '../../auth/utils';
 import { customHttpResponse } from '../helpers/customHttpResponse';
+import { getToken } from '../helpers';
 const logger = createLogger('delete');
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  logger.info('Processing event: ', event)
   const todoId = event.pathParameters.todoId;
-  logger.info('trying to delete', todoId);
   const token = getToken(event.headers);
-  const userId = parseUserId(token);
-  const params = {
-    TableName: todosTable,
-    Key: {
-      userId,
-      todoId
-    },
-    ConditionExpression:"todoId = :todoId",
-    ExpressionAttributeValues: {
-      ":todoId": todoId
-    }
-  };
-
-
-  await docClient.delete(params).promise();
-  
+  await deleteTodo(todoId, token);
   return customHttpResponse({ statusCode: 200 });
 }
