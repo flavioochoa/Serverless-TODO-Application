@@ -4,10 +4,38 @@ import { APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult } f
 
 import { UpdateTodoRequest } from '../../requests/UpdateTodoRequest'
 
-export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  const todoId = event.pathParameters.todoId
-  const updatedTodo: UpdateTodoRequest = JSON.parse(event.body)
+import { docClient, todosTable, getToken } from '../helpers';
+import { parseUserId } from '../../auth/utils';
+import { customHttpResponse } from '../helpers/customHttpResponse';
 
-  // TODO: Update a TODO item with the provided id using values in the "updatedTodo" object
-  return undefined
+export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const todoId = event.pathParameters.todoId;
+  const updatedTodo: UpdateTodoRequest = JSON.parse(event.body);
+  const { name, dueDate, done } = updatedTodo;
+  const token = getToken(event.headers);
+  const userId = parseUserId(token);
+  
+  const params = {
+    TableName: todosTable,
+    Key: {
+      userId,
+      todoId
+    },
+    UpdateExpression: "set #name_value = :nameValue, dueDate=:dueDate, done=:done ",
+    ConditionExpression:"todoId = :todoId",
+    ExpressionAttributeValues: {
+      ":nameValue": name,
+      ":dueDate": dueDate,
+      ":done": done,
+      ':todoId': todoId,
+    },
+    ExpressionAttributeNames: {
+      "#name_value": "name"
+    },
+    ReturnValues: "UPDATED_NEW"
+  };
+
+  await docClient.update(params).promise();
+
+  return customHttpResponse({ statusCode: 200 });
 }
